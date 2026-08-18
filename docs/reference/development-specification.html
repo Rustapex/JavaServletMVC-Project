@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>영화 예매 및 리뷰 시스템 - MVC 개발명세서 수정본</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+    background: #f7f7f7;
+    color: #222;
+  }
+  .page {
+    max-width: 1500px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 28px;
+    border: 1px solid #ddd;
+  }
+  h1 { margin: 0 0 8px; font-size: 26px; }
+  .desc { margin: 0 0 20px; color: #555; line-height: 1.7; }
+  .notice, .change-box {
+    background: #fff8e1;
+    border: 1px solid #e3c766;
+    padding: 12px 14px;
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+  .change-box { background: #eef7ff; border-color: #8ab8df; }
+  h2 {
+    margin: 32px 0 12px;
+    font-size: 19px;
+    border-left: 6px solid #333;
+    padding-left: 10px;
+  }
+  h3 { margin: 24px 0 10px; font-size: 16px; }
+  .table-wrap { width: 100%; overflow-x: auto; margin-bottom: 26px; }
+  table {
+    width: 100%;
+    min-width: 1320px;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid #999;
+    padding: 8px 9px;
+    vertical-align: top;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  th { background: #e9e9e9; text-align: center; font-weight: 700; }
+  td.center { text-align: center; }
+  .method-get { color: #0b6b2b; font-weight: 700; }
+  .method-post { color: #b45309; font-weight: 700; }
+  .json { color: #5b21b6; font-weight: 700; }
+  .section-row td { background: #333; color: #fff; font-weight: 700; font-size: 14px; }
+  .small { color: #555; font-size: 12px; }
+  code { background: #f2f2f2; padding: 2px 5px; border-radius: 4px; }
+  ul { margin-top: 6px; margin-bottom: 6px; }
+  li { margin: 4px 0; }
+  .narrow table { min-width: 980px; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { border: 0; max-width: none; padding: 14px; }
+    .table-wrap { overflow: visible; }
+    table { font-size: 10px; min-width: 0; }
+    th, td { padding: 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>영화 예매 및 리뷰 시스템 - MVC 개발명세서 수정본</h1>
+  <p class="desc">
+    Servlet + JSP 기반 MVC2 개발명세서입니다. View가 JSP이면 화면 출력, JSON이면 AJAX 응답, 재요청은 처리 후 redirect 기준입니다.<br>
+    영화 기준 조회는 <b>api_movie_id가 아니라 MOVIE_ID</b>를 사용합니다. KMDb API 값은 MOVIE 테이블에 저장한 뒤, 예매/리뷰/다이어리에서 MOVIE_ID로 참조합니다.
+  </p>
+  <div class="notice">
+    <b>공통 약속</b><br>
+    세션 로그인 회원명: <code>loginMember</code><br>
+    JSP 위치: <code>/WEB-INF/views/</code><br>
+    JSON 응답: 좌석 조회, 영화 저장, 리뷰 목록/필터, 친구 검색 등 AJAX 기능에서 사용<br>
+    KMDb API 저장 테이블: <code>MOVIE</code>, <code>MOVIE_ACTOR</code>, <code>MOVIE_KEYWORD</code><br>
+    영화 검색 목록 화면은 <code>MovieSearchResultDTO</code>를 request attribute <code>result</code>로 전달합니다.
+  </div>
+
+  <div class="change-box">
+    <b>이번 수정 반영 내용</b>
+    <ul>
+      <li><code>MovieSearchServlet</code>은 query/page를 받고 <code>MovieSearchService.search(query, page)</code>만 호출하도록 변경</li>
+      <li><code>MovieSearchService</code>를 추가하여 API 호출, 페이징 생성, 목록 출력용 DTO 변환 담당</li>
+      <li><code>PagingDTO</code>를 추가하여 totalPage, startPage, endPage, hasPrev, hasNext 계산 담당</li>
+      <li><code>MovieListItemDTO</code>, <code>MovieApiSearchResultDTO</code>, <code>MovieSearchResultDTO</code> 추가</li>
+      <li><code>movieList.jsp</code>는 <code>result.movieItems</code>, <code>result.paging</code>만 출력하도록 변경</li>
+      <li>영화 검색 한 페이지 출력 개수는 12개, 페이지 번호 묶음은 5개 기준</li>
+    </ul>
+  </div>
+
+  <h2>전체 개발명세서</h2>
+  <div class="table-wrap">
+  <table>
+    <colgroup>
+      <col style="width: 9%">
+      <col style="width: 12%">
+      <col style="width: 6%">
+      <col style="width: 13%">
+      <col style="width: 17%">
+      <col style="width: 15%">
+      <col style="width: 15%">
+      <col style="width: 11%">
+      <col style="width: 17%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>기능명</th>
+        <th>요청 매핑</th>
+        <th>방식</th>
+        <th>Servlet</th>
+        <th>Service</th>
+        <th>DAO</th>
+        <th>DTO</th>
+        <th>응답/View</th>
+        <th>재요청/비고</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="section-row"><td colspan="9">회원 / 로그인</td></tr>
+      <tr><td>로그인 화면 이동</td><td>/login.do</td><td class="center method-get">GET</td><td>LoginFormServlet</td><td>-</td><td>-</td><td>-</td><td>login.jsp</td><td>-</td></tr>
+      <tr><td>로그인 처리</td><td>/login.do</td><td class="center method-post">POST</td><td>LoginServlet</td><td>MemberService</td><td>MemberDAO</td><td>MemberDTO</td><td>-</td><td>성공: /main.do<br>실패: /login.do<br>세션에 loginMember 저장</td></tr>
+      <tr><td>로그아웃</td><td>/logout.do</td><td class="center method-get">GET</td><td>LogoutServlet</td><td>-</td><td>-</td><td>-</td><td>-</td><td>/main.do<br>session.invalidate()</td></tr>
+      <tr><td>회원가입 화면 이동</td><td>/join.do</td><td class="center method-get">GET</td><td>JoinFormServlet</td><td>-</td><td>-</td><td>-</td><td>join.jsp</td><td>-</td></tr>
+      <tr><td>회원가입 처리</td><td>/join.do</td><td class="center method-post">POST</td><td>JoinServlet</td><td>MemberService</td><td>MemberDAO</td><td>MemberDTO</td><td>-</td><td>성공: /login.do<br>실패: /join.do<br>아이디 중복 확인 필요</td></tr>
+      <tr><td>아이디 중복 확인</td><td>/member/idCheck.do</td><td class="center method-get">GET</td><td>IdCheckServlet</td><td>MemberService</td><td>MemberDAO</td><td>MemberDTO</td><td class="json">JSON</td><td>AJAX</td></tr>
+      <tr><td>마이페이지 이동</td><td>/member/mypage.do</td><td class="center method-get">GET</td><td>MypageServlet</td><td>MemberService, ReservationService, ReviewService, DiaryService</td><td>MemberDAO, ReservationDAO, ReviewDAO, DiaryDAO</td><td>MemberDTO, ReservationDTO, ReviewDTO, DiaryDTO</td><td>mypage.jsp</td><td>로그인 필요</td></tr>
+
+      <tr class="section-row"><td colspan="9">영화 정보 / KMDb API</td></tr>
+      <tr><td>영화 검색</td><td>/movie/search.do</td><td class="center method-get">GET</td><td>MovieSearchServlet</td><td>MovieSearchService, MovieApiService</td><td>-</td><td>MovieSearchResultDTO, MovieListItemDTO, MovieApiSearchResultDTO, MovieDTO, PagingDTO</td><td>movieList.jsp</td><td>query/page 요청<br>한 페이지 12개<br>페이지 번호 5개 단위<br>request attribute: result<br>JSP는 result.movieItems/result.paging 출력</td></tr>
+      <tr><td>영화 상세 조회</td><td>/movie/detail.do</td><td class="center method-get">GET</td><td>MovieDetailServlet</td><td>MovieApiService, MovieService, ReviewService</td><td>MovieDAO, MovieActorDAO, MovieKeywordDAO, ReviewDAO, FriendDAO</td><td>MovieDTO, ReviewDTO, ReviewStatDTO</td><td>movieDetail.jsp</td><td>MOVIE에 없으면 저장 후 MOVIE_ID 기준 조회<br>리뷰 공개/비공개 권한 처리</td></tr>
+      <tr><td>영화 DB 저장</td><td>/movie/save.do</td><td class="center method-post">POST</td><td>MovieSaveServlet</td><td>MovieService</td><td>MovieDAO, MovieActorDAO, MovieKeywordDAO</td><td>MovieDTO, MovieActorDTO, MovieKeywordDTO</td><td class="json">JSON</td><td>movie_id 반환<br>예매/리뷰 작성 전 MOVIE_ID 확보</td></tr>
+
+      <tr class="section-row"><td colspan="9">상영 관리</td></tr>
+      <tr><td>상영 시간 조회</td><td>/schedule/list.do</td><td class="center method-get">GET</td><td>ScheduleListServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td class="json">JSON</td><td>movie_id 기준<br>예매 화면에서 AJAX</td></tr>
+      <tr><td>상영 정보 상세 조회</td><td>/schedule/detail.do</td><td class="center method-get">GET</td><td>ScheduleDetailServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td class="json">JSON</td><td>좌석 조회 전 사용</td></tr>
+      <tr><td>극장 목록 조회</td><td>/theater/list.do</td><td class="center method-get">GET</td><td>TheaterListServlet</td><td>TheaterService</td><td>TheaterDAO</td><td>TheaterDTO</td><td class="json">JSON</td><td>선택 기능</td></tr>
+      <tr><td>상영관 목록 조회</td><td>/screen/list.do</td><td class="center method-get">GET</td><td>ScreenListServlet</td><td>ScreenService</td><td>ScreenDAO</td><td>ScreenDTO</td><td class="json">JSON</td><td>관리자 상영 등록에 사용</td></tr>
+
+      <tr class="section-row"><td colspan="9">예매 / 좌석</td></tr>
+      <tr><td>예매 화면 이동</td><td>/reservation/form.do</td><td class="center method-get">GET</td><td>ReservationFormServlet</td><td>MovieService, ScheduleService, SeatService</td><td>MovieDAO, ScheduleDAO, SeatDAO</td><td>MovieDTO, ScheduleDTO, SeatDTO</td><td>reservationForm.jsp</td><td>로그인 필요<br>movie_id 기준</td></tr>
+      <tr><td>좌석 조회</td><td>/seat/list.do</td><td class="center method-get">GET</td><td>SeatListServlet</td><td>SeatService</td><td>SeatDAO</td><td>SeatDTO</td><td class="json">JSON</td><td>schedule_id 기준<br>이미 예매된 좌석 포함 반환</td></tr>
+      <tr><td>좌석 선택 상태 확인</td><td>/seat/check.do</td><td class="center method-get">GET</td><td>SeatCheckServlet</td><td>SeatService</td><td>SeatDAO</td><td>SeatDTO</td><td class="json">JSON</td><td>중복 예매 확인<br>UNIQUE(schedule_id, seat_id)</td></tr>
+      <tr><td>예매 확정</td><td>/reservation/insert.do</td><td class="center method-post">POST</td><td>ReservationInsertServlet</td><td>ReservationService, DiaryService</td><td>ReservationDAO, ReservationSeatDAO, DiaryDAO</td><td>ReservationDTO, ReservationSeatDTO, DiaryDTO</td><td>-</td><td>성공: /reservation/complete.do<br>실패: /reservation/form.do<br>예매 완료 후 다이어리 자동 등록</td></tr>
+      <tr><td>예매 완료 화면</td><td>/reservation/complete.do</td><td class="center method-get">GET</td><td>ReservationCompleteServlet</td><td>ReservationService</td><td>ReservationDAO</td><td>ReservationDTO</td><td>reservationComplete.jsp</td><td>reservation_id 기준 조회</td></tr>
+      <tr><td>예매 내역 조회</td><td>/reservation/myList.do</td><td class="center method-get">GET</td><td>MyReservationServlet</td><td>ReservationService</td><td>ReservationDAO</td><td>ReservationDTO</td><td>myReservation.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>예매 상세 조회</td><td>/reservation/detail.do</td><td class="center method-get">GET</td><td>ReservationDetailServlet</td><td>ReservationService</td><td>ReservationDAO</td><td>ReservationDTO</td><td>reservationDetail.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>예매 취소</td><td>/reservation/cancel.do</td><td class="center method-post">POST</td><td>ReservationCancelServlet</td><td>ReservationService</td><td>ReservationDAO, ReservationSeatDAO</td><td>ReservationDTO</td><td>-</td><td>/reservation/myList.do<br>취소 시 reservation_seat 행 삭제</td></tr>
+      <tr><td>예매 변경 화면 이동</td><td>/reservation/updateForm.do</td><td class="center method-get">GET</td><td>ReservationUpdateFormServlet</td><td>ReservationService, SeatService</td><td>ReservationDAO, SeatDAO</td><td>ReservationDTO, SeatDTO</td><td>reservationUpdate.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>예매 변경 처리</td><td>/reservation/update.do</td><td class="center method-post">POST</td><td>ReservationUpdateServlet</td><td>ReservationService</td><td>ReservationDAO, ReservationSeatDAO</td><td>ReservationDTO</td><td>-</td><td>/reservation/myList.do<br>기존 좌석 삭제 후 새 좌석 등록</td></tr>
+
+      <tr class="section-row"><td colspan="9">리뷰</td></tr>
+      <tr><td>리뷰 목록 조회</td><td>/review/list.do</td><td class="center method-get">GET</td><td>ReviewListServlet</td><td>ReviewService, FriendService</td><td>ReviewDAO, FriendDAO</td><td>ReviewDTO</td><td class="json">JSON</td><td>movie_id 기준<br>공개/비공개 권한 반영</td></tr>
+      <tr><td>리뷰 등록</td><td>/review/insert.do</td><td class="center method-post">POST</td><td>ReviewInsertServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewDTO</td><td>-</td><td>/movie/detail.do?movieId=...<br>로그인 필요</td></tr>
+      <tr><td>리뷰 수정 화면</td><td>/review/updateForm.do</td><td class="center method-get">GET</td><td>ReviewUpdateFormServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewDTO</td><td>reviewUpdate.jsp</td><td>작성자 본인만 가능</td></tr>
+      <tr><td>리뷰 수정</td><td>/review/update.do</td><td class="center method-post">POST</td><td>ReviewUpdateServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewDTO</td><td>-</td><td>/movie/detail.do<br>작성자 본인만 가능</td></tr>
+      <tr><td>리뷰 삭제</td><td>/review/delete.do</td><td class="center method-post">POST</td><td>ReviewDeleteServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewDTO</td><td>-</td><td>/movie/detail.do<br>작성자 본인만 가능</td></tr>
+      <tr><td>리뷰 통계 조회</td><td>/review/stat.do</td><td class="center method-get">GET</td><td>ReviewStatServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewStatDTO</td><td class="json">JSON</td><td>공개 리뷰 기준</td></tr>
+      <tr><td>리뷰 정렬/필터</td><td>/review/filter.do</td><td class="center method-get">GET</td><td>ReviewFilterServlet</td><td>ReviewService, FriendService</td><td>ReviewDAO, FriendDAO</td><td>ReviewDTO</td><td class="json">JSON</td><td>최신순/오래된순/신선/비신선/내 리뷰</td></tr>
+      <tr><td>내 리뷰 조회</td><td>/review/myList.do</td><td class="center method-get">GET</td><td>MyReviewServlet</td><td>ReviewService</td><td>ReviewDAO</td><td>ReviewDTO</td><td>myReview.jsp</td><td>로그인 필요</td></tr>
+
+      <tr class="section-row"><td colspan="9">친구</td></tr>
+      <tr><td>친구 목록 조회</td><td>/friend/list.do</td><td class="center method-get">GET</td><td>FriendListServlet</td><td>FriendService</td><td>FriendDAO, MemberDAO</td><td>FriendDTO, MemberDTO</td><td>friendList.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>친구 추가</td><td>/friend/insert.do</td><td class="center method-post">POST</td><td>FriendInsertServlet</td><td>FriendService</td><td>FriendDAO, MemberDAO</td><td>FriendDTO, MemberDTO</td><td>-</td><td>/friend/list.do<br>자기 자신/중복/없는 회원 방지<br>min/max 저장</td></tr>
+      <tr><td>친구 삭제</td><td>/friend/delete.do</td><td class="center method-post">POST</td><td>FriendDeleteServlet</td><td>FriendService</td><td>FriendDAO</td><td>FriendDTO</td><td>-</td><td>/friend/list.do</td></tr>
+      <tr><td>친구 여부 확인</td><td>/friend/check.do</td><td class="center method-get">GET</td><td>FriendCheckServlet</td><td>FriendService</td><td>FriendDAO</td><td>FriendDTO</td><td class="json">JSON</td><td>비공개 리뷰 권한 판단</td></tr>
+      <tr><td>회원 검색</td><td>/friend/searchMember.do</td><td class="center method-get">GET</td><td>FriendMemberSearchServlet</td><td>MemberService</td><td>MemberDAO</td><td>MemberDTO</td><td class="json">JSON</td><td>친구 추가용</td></tr>
+
+      <tr class="section-row"><td colspan="9">필름 다이어리</td></tr>
+      <tr><td>필름 다이어리 조회</td><td>/diary/list.do</td><td class="center method-get">GET</td><td>DiaryListServlet</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryDTO</td><td>filmDiary.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>달력별 기록 조회</td><td>/diary/calendar.do</td><td class="center method-get">GET</td><td>DiaryCalendarServlet</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryDTO</td><td class="json">JSON</td><td>watch_date 기준<br>달력 AJAX</td></tr>
+      <tr><td>다이어리 자동 등록</td><td>내부 호출</td><td class="center method-post">POST</td><td>-</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryDTO, ReservationDTO</td><td>-</td><td>예매 완료 후 insert<br>reservation_id unique</td></tr>
+      <tr><td>감정 태그 등록/수정</td><td>/diary/tagUpdate.do</td><td class="center method-post">POST</td><td>DiaryTagUpdateServlet</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryDTO</td><td>-</td><td>/diary/list.do</td></tr>
+      <tr><td>다이어리 상세 조회</td><td>/diary/detail.do</td><td class="center method-get">GET</td><td>DiaryDetailServlet</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryDTO</td><td>diaryDetail.jsp</td><td>본인만 가능</td></tr>
+      <tr><td>연간 통계 조회</td><td>/diary/stat.do</td><td class="center method-get">GET</td><td>DiaryStatServlet</td><td>DiaryService</td><td>DiaryDAO</td><td>DiaryStatDTO</td><td>diaryStat.jsp</td><td>본인만 가능</td></tr>
+
+      <tr class="section-row"><td colspan="9">관리자</td></tr>
+      <tr><td>관리자 메인</td><td>/admin/main.do</td><td class="center method-get">GET</td><td>AdminMainServlet</td><td>-</td><td>-</td><td>-</td><td>adminMain.jsp</td><td>관리자 권한</td></tr>
+      <tr><td>상영 정보 등록 화면</td><td>/admin/scheduleForm.do</td><td class="center method-get">GET</td><td>AdminScheduleFormServlet</td><td>MovieService, ScreenService</td><td>MovieDAO, ScreenDAO</td><td>MovieDTO, ScreenDTO</td><td>scheduleForm.jsp</td><td>관리자 권한</td></tr>
+      <tr><td>상영 정보 등록</td><td>/admin/scheduleInsert.do</td><td class="center method-post">POST</td><td>AdminScheduleInsertServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td>-</td><td>/admin/scheduleList.do</td></tr>
+      <tr><td>상영 정보 목록 관리</td><td>/admin/scheduleList.do</td><td class="center method-get">GET</td><td>AdminScheduleListServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td>scheduleManage.jsp</td><td>관리자 권한</td></tr>
+      <tr><td>상영 정보 수정</td><td>/admin/scheduleUpdate.do</td><td class="center method-post">POST</td><td>AdminScheduleUpdateServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td>-</td><td>/admin/scheduleList.do</td></tr>
+      <tr><td>상영 정보 삭제</td><td>/admin/scheduleDelete.do</td><td class="center method-post">POST</td><td>AdminScheduleDeleteServlet</td><td>ScheduleService</td><td>ScheduleDAO</td><td>ScheduleDTO</td><td>-</td><td>/admin/scheduleList.do</td></tr>
+      <tr><td>좌석 정보 생성/관리</td><td>/admin/seatManage.do</td><td class="center method-post">POST</td><td>AdminSeatManageServlet</td><td>SeatService</td><td>SeatDAO</td><td>SeatDTO</td><td>-</td><td>/admin/scheduleList.do<br>선택 기능</td></tr>
+
+      <tr class="section-row"><td colspan="9">공통 / 권한</td></tr>
+      <tr><td>로그인 권한 체크</td><td>Filter</td><td class="center">-</td><td>LoginCheckFilter</td><td>-</td><td>-</td><td>-</td><td>-</td><td>권한 없음: /login.do<br>예매/리뷰/친구/마이페이지 접근 시</td></tr>
+      <tr><td>관리자 권한 체크</td><td>Filter</td><td class="center">-</td><td>AdminCheckFilter</td><td>-</td><td>-</td><td>-</td><td>-</td><td>권한 없음: /main.do<br>관리자 메뉴 접근 시</td></tr>
+      <tr><td>에러 페이지 이동</td><td>/error.do</td><td class="center method-get">GET</td><td>ErrorServlet</td><td>-</td><td>-</td><td>-</td><td>error.jsp</td><td>예외 처리 공통 화면</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>영화 검색 MVC2 상세 분리</h2>
+  <div class="table-wrap narrow">
+  <table>
+    <colgroup><col style="width:20%"><col style="width:25%"><col style="width:55%"></colgroup>
+    <thead><tr><th>구분</th><th>파일/클래스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>Controller</td><td>MovieSearchServlet</td><td>query/page 파라미터를 받고 MovieSearchService.search(query, page)를 호출한다. 반환받은 MovieSearchResultDTO를 request의 result로 담고 /WEB-INF/views/movieList.jsp로 forward한다.</td></tr>
+      <tr><td>Service</td><td>MovieSearchService</td><td>MovieApiService를 호출하고, PagingDTO를 생성하며, MovieDTO 목록을 MovieListItemDTO 목록으로 변환한다. 최종적으로 MovieSearchResultDTO를 반환한다.</td></tr>
+      <tr><td>API Service</td><td>MovieApiService</td><td>KMDb API 요청 URL 생성, GET 요청, JSON 파싱, MovieDTO 생성, totalCount 추출을 담당한다. listCount/pageSize는 12개 기준으로 호출된다.</td></tr>
+      <tr><td>DTO</td><td>PagingDTO</td><td>currentPage, pageSize, pageBlockSize, totalCount를 기준으로 totalPage, startPage, endPage, hasPrev, hasNext, prevPage, nextPage, pageNumbers를 계산한다.</td></tr>
+      <tr><td>DTO</td><td>MovieListItemDTO</td><td>movieList.jsp 카드 출력에 필요한 값만 보관한다. KMDb movieId, movieSeq, title, directorNm, displayReleaseDate, posterUrl을 가진다.</td></tr>
+      <tr><td>DTO</td><td>MovieApiSearchResultDTO</td><td>MovieApiService가 반환하는 API 검색 결과 묶음이다. MovieDTO 목록과 totalCount를 담는다.</td></tr>
+      <tr><td>DTO</td><td>MovieSearchResultDTO</td><td>MovieSearchService가 Servlet에 반환하는 최종 결과 묶음이다. query, hasQuery, hasResult, movieItems, paging을 담는다.</td></tr>
+      <tr><td>View</td><td>movieList.jsp</td><td>result.movieItems와 result.paging을 JSTL/EL로 출력한다. API 호출, DB 처리, 페이징 공식, 날짜 변환 로직은 작성하지 않는다.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>DTO / Service / DAO 추가 목록</h2>
+  <div class="table-wrap">
+  <table>
+    <colgroup><col style="width:15%"><col style="width:25%"><col style="width:60%"></colgroup>
+    <thead><tr><th>구분</th><th>이름</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>DTO</td><td>MovieDTO</td><td>KMDb에서 가져온 영화 기본 정보 저장: 영화명, KMDb 식별자, 감독명, 제작사, 줄거리, 상영시간, 개봉일, 포스터 URL, VOD URL 등</td></tr>
+      <tr><td>DTO</td><td>MovieApiSearchResultDTO</td><td>MovieApiService가 API 검색 결과를 반환할 때 사용하는 DTO. MovieDTO 목록과 totalCount를 함께 보관</td></tr>
+      <tr><td>DTO</td><td>MovieListItemDTO</td><td>movieList.jsp 목록 화면에 필요한 값만 보관: kmdbMovieId, kmdbMovieSeq, title, directorNm, displayReleaseDate, posterUrl</td></tr>
+      <tr><td>DTO</td><td>MovieSearchResultDTO</td><td>영화 검색 화면에 필요한 최종 결과 DTO. query, hasQuery, hasResult, movieItems, paging 보관</td></tr>
+      <tr><td>DTO</td><td>PagingDTO</td><td>공통 페이징 계산 DTO. totalPage, startPage, endPage, hasPrev, hasNext, pageNumbers 등 계산</td></tr>
+      <tr><td>DTO</td><td>MovieActorDTO</td><td>영화별 배우명 저장. 배우별 영화 검색은 하지 않더라도 다중값 분리를 위해 사용</td></tr>
+      <tr><td>DTO</td><td>MovieKeywordDTO</td><td>영화별 키워드 저장. 다중값 분리를 위해 사용</td></tr>
+      <tr><td>DAO</td><td>MovieDAO</td><td>MOVIE 테이블 저장/조회</td></tr>
+      <tr><td>DAO</td><td>MovieActorDAO</td><td>MOVIE_ACTOR 테이블 저장/조회</td></tr>
+      <tr><td>DAO</td><td>MovieKeywordDAO</td><td>MOVIE_KEYWORD 테이블 저장/조회</td></tr>
+      <tr><td>Service</td><td>MovieApiService</td><td>KMDb API 요청 URL 생성, JSON 응답 수신, 필요한 출력값 추출, totalCount 추출</td></tr>
+      <tr><td>Service</td><td>MovieSearchService</td><td>영화 검색 화면 전용 Service. API 호출, 페이징 생성, 목록용 DTO 변환, 최종 result DTO 생성</td></tr>
+      <tr><td>Service</td><td>MovieService</td><td>API에서 받은 영화 정보를 DB에 저장하고 MOVIE_ID 반환</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>영화 검색 요청 흐름</h2>
+  <div class="change-box">
+    <ol>
+      <li>사용자가 <code>/movie/search.do?query=검색어&amp;page=1</code>로 요청한다.</li>
+      <li><code>MovieSearchServlet</code>이 query와 page를 받는다.</li>
+      <li><code>MovieSearchServlet</code>이 <code>MovieSearchService.search(query, page)</code>를 호출한다.</li>
+      <li><code>MovieSearchService</code>가 <code>MovieApiService.searchMovies(query, page, 12)</code>를 호출한다.</li>
+      <li><code>MovieApiService</code>가 KMDb API를 호출하고 JSON을 파싱하여 <code>MovieApiSearchResultDTO</code>를 반환한다.</li>
+      <li><code>MovieSearchService</code>가 <code>PagingDTO</code>를 만들고 <code>MovieDTO</code>를 <code>MovieListItemDTO</code>로 변환한다.</li>
+      <li><code>MovieSearchService</code>가 <code>MovieSearchResultDTO</code>를 Servlet에 반환한다.</li>
+      <li><code>MovieSearchServlet</code>이 <code>request.setAttribute("result", result)</code>로 저장하고 <code>movieList.jsp</code>로 forward한다.</li>
+      <li><code>movieList.jsp</code>는 <code>result.movieItems</code>와 <code>result.paging</code>을 출력한다.</li>
+    </ol>
+  </div>
+
+  <p class="small">파일명: movie_mvc_development_spec_search_updated.html</p>
+</div>
+</body>
+</html>
