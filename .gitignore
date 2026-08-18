@@ -99,11 +99,6 @@ Thumbs.db
 *.ear
 .classpath
 
-# =========================
-# Local docs
-# =========================
-docs/
-
 # local config files
 src/main/resources/config.properties
 
